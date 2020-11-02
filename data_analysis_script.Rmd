@@ -6,13 +6,16 @@ abstract: |
   In this report, we will be predicting the winner for 
   the 2020 United States Election. We utilized two datasets, 
   Democracy Fund + UCLA Nationscape Data and American 
-  Community Survey (ACS) Data, to perform Multilevel Modeling 
-  with Post-Stratification (MRP). The model that we are using 
+  Community Survey (ACS) Data to perform Multilevel Modeling 
+  with Post-Stratification (MRP). This analysis is useful and 
+  important because we included all the basic yet crucial information 
+  that can easily be obtain from the public. With our model, broader 
+  predictions can be made. The model that we are using 
   in this analysis is Logistic Regression, since the response 
   variable that we have is binary, Joe Biden or Donald Trump. 
   After our prediction on the post-stratification data (ACS) 
-  data, we can see that Joe Biden wins the popular vote and 
-  the electoral vote. In addition to the voting prediction, we
+  data, we can conclude that Joe Biden wins 53% the popular vote with 0.17 
+  variance and 52% the electoral vote. In addition to the voting prediction, we
   also find out that Race, Income Level, and State Residency
   contribute primarily to a person's voting choice.
 
@@ -24,6 +27,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+# import the librarys needed for the analysis
 library(readr)
 library(brms)
 library(tidyverse)
@@ -37,10 +41,9 @@ library(ROCR)
 library(usmap)
 library(gridExtra)
 
-options(future.globals.maxSize = 4000 * 1024^10)
-
-# get the data
+# get the data from the input folder
 ind_level <- read_csv("inputs/data/ind_level.csv")
+# select the columns needed
 ind_level <- ind_level %>% 
   select(vote_2020,
          vote_2020_lean,
@@ -51,7 +54,9 @@ ind_level <- ind_level %>%
          education,
          state,
          age) 
+# get the data from the input folder
 post_level <- read_csv("inputs/data/post_level.csv")
+# select the columns needed
 post_level <- 
   post_level %>% 
   select(employment,
@@ -64,24 +69,34 @@ post_level <-
 ```
 
 ```{r, echo=FALSE, eval=FALSE}
+# fit the model with brm function with bernoulli distribution
+# set the seed for reproducibility and the priors
 voting_fit <- brm(vote_2020 ~ 1 + gender + age + race_ethnicity + household_income + education + state, family = bernoulli(link = "logit"), prior = set_prior("normal(0, 10)", class = "b"), seed = 123, data = ind_level, core = 4)
 
+# save the model into voting_fit.rda and place it in the output file, so we don't have the run the above model again later on 
 save(voting_fit, file = "outputs/voting_fit.rda")
 ```
 
 
 ```{r, echo=FALSE, results='hide'}
+# load the voting_fit.rda that we saved above 
 load(file = "outputs/voting_fit.rda")
-# Find the correct classification rate
+# Find the correct classification rate by fitting the original data
 Prob <- predict(voting_fit, type = "response")
+# In this case, if the probability is larger than 0.5, then it's classified as Donald Trump voteer
 ind_pred <- ifelse(Prob < 0.5, "Donald Trump", "Joe Biden")
+# Confusion Matrix
 ConfusionMatrix <- table(ind_pred[,1], pull(ind_level,vote_2020))
+# accuracy
 sum(diag(ConfusionMatrix))/sum(ConfusionMatrix)
 
 
 # Model Evaluation AUC curve 
+# Predict the original data
 Prob <- predict(voting_fit, type = "response")
+# get the mean vector of the prediction
 Prob <- Prob[,1]
+# calculate the AUC
 Pred <- prediction(Prob, as.vector(pull(ind_level, vote_2020)))
 AUC <- performance(Pred, measure = "auc")
 AUC <- AUC@y.values[[1]]
@@ -90,7 +105,7 @@ AUC <- AUC@y.values[[1]]
 
 ```{r, results='hide', echo=FALSE, message=FALSE}
 # Plot the race comparison between post-stratification data and individual level data 
-
+# Organize the race data for both datas 
 post_race <- post_level %>%
   group_by(race_ethnicity) %>%
   summarise(n = n()) %>%
@@ -103,8 +118,10 @@ ind_race <- ind_level %>%
   mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = race_ethnicity) %>%
   ungroup()
 
+# combine the datasets
 total_race <- rbind(post_race, ind_race)
 
+# assignt the plot to a variable to be used later on in the report
 race <- ggplot(data = total_race, aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
   geom_point(stat = "identity", colour = "black") + 
   geom_line() +
@@ -117,7 +134,7 @@ race <- ggplot(data = total_race, aes(x = as.factor(CAT), y = PROB, group = as.f
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
 # Plot the sex comparison between post-stratification data and individual level data 
-
+# Organize the race data for both datas 
 post_gender <- post_level %>%
   group_by(gender) %>%
   summarise(n = n()) %>%
@@ -130,8 +147,10 @@ ind_gender <- ind_level %>%
   mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = gender) %>%
   ungroup()
 
+# combine the datasets
 total_gender <- rbind(post_gender, ind_gender)
 
+# assignt the plot to a variable to be used later on in the report
 gender <- ggplot(data = total_gender, 
                  aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
   geom_point(stat = "identity", colour = "black") + 
@@ -142,6 +161,7 @@ gender <- ggplot(data = total_gender,
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 # Plot the age comparison between post-stratification data and individual level data 
+# Organize the race data for both datas 
 post_age <- post_level %>%
   group_by(age) %>%
   summarise(n = n()) %>%
@@ -154,8 +174,10 @@ ind_age <- ind_level %>%
   mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = age) %>%
   ungroup()
 
+# combine the datasets
 total_age <- rbind(post_age, ind_age)
 
+# assignt the plot to a variable to be used later on in the report
 age <- ggplot(data = total_age, aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
   geom_point(stat = "identity", colour = "black") + 
   geom_line() +
@@ -165,6 +187,7 @@ age <- ggplot(data = total_age, aes(x = as.factor(CAT), y = PROB, group = as.fac
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 # Plot the employment comparison between post-stratification data and individual level data 
+# Organize the race data for both datas 
 post_employment <- post_level %>%
   group_by(employment) %>%
   summarise(n = n()) %>%
@@ -177,8 +200,10 @@ ind_employment <- ind_level %>%
   mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = employment) %>%
   ungroup()
 
+# combine the datasets
 total_employment <- rbind(post_employment, ind_employment)
 
+# assignt the plot to a variable to be used later on in the report
 employment <- ggplot(data = total_employment, aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
   geom_point(stat = "identity", colour = "black") + 
   geom_line() +
@@ -188,7 +213,7 @@ employment <- ggplot(data = total_employment, aes(x = as.factor(CAT), y = PROB, 
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 # Plot the education comparison between post-stratification data and individual level data 
-
+# Organize the race data for both datas 
 post_education <- post_level %>%
   group_by(education) %>%
   summarise(n = n()) %>%
@@ -201,8 +226,10 @@ ind_education <- ind_level %>%
   mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = education) %>%
   ungroup()
 
+# combine the datasets
 total_education <- rbind(post_education, ind_education)
 
+# assignt the plot to a variable to be used later on in the report
 education <- ggplot(data = total_education, 
                     aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
   geom_point(stat = "identity", colour = "black") + 
@@ -213,7 +240,7 @@ education <- ggplot(data = total_education,
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 # Plot the state comparison between post-stratification data and individual level data 
-
+# Organize the race data for both datas 
 post_state<- post_level %>%
   group_by(state) %>%
   summarise(n = n()) %>%
@@ -226,8 +253,10 @@ ind_state <- ind_level %>%
   mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = state) %>%
   ungroup()
 
+# combine the datasets
 total_state <- rbind(post_state, ind_state)
 
+# assignt the plot to a variable to be used later on in the report
 state <- ggplot(data = total_state, aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
   geom_point(stat = "identity", colour = "black") + 
   geom_line() +
@@ -237,7 +266,7 @@ state <- ggplot(data = total_state, aes(x = as.factor(CAT), y = PROB, group = as
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 # Plot the income comparison between post-stratification data and individual level data 
-
+# Organize the race data for both datas 
 post_household_income<- post_level %>%
   group_by(household_income) %>%
   summarise(n = n()) %>%
@@ -250,8 +279,10 @@ ind_household_income <- ind_level %>%
   mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = household_income) %>%
   ungroup()
 
+# combine the datasets
 total_household_income <- rbind(post_household_income, ind_household_income)
 
+# assignt the plot to a variable to be used later on in the report
 income <- ggplot(data = total_household_income, aes(x = as.factor(CAT), y = PROB, group = TYPE, linetype = TYPE)) +
   geom_point(stat = "identity", colour = "black") + 
   geom_line() +
@@ -261,12 +292,11 @@ income <- ggplot(data = total_household_income, aes(x = as.factor(CAT), y = PROB
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 ```
 
-
-
-
 ```{r, echo=FALSE, eval=FALSE, results='hide'}
+# remove large datasets to clean up space for the memory 
 rm(ind_level)
-nrow(post_level)/2
+# Perform prediction on the post-stratification data 
+# the predictions have to be done separately because of the hardware constraint
 post_predict <- voting_fit%>% predict(newdata = post_level[1:100000,], summary = TRUE)
 post_predict2 <- voting_fit%>% predict(newdata = post_level[100001:200000,], summary = TRUE)
 post_predict3 <- voting_fit%>% predict(newdata = post_level[200001:300000,], summary = TRUE)
@@ -276,6 +306,7 @@ post_predict6 <- voting_fit%>% predict(newdata = post_level[500001:600000,], sum
 post_predict7 <- voting_fit%>% predict(newdata = post_level[600001:700000,], summary = TRUE)
 post_predict8 <- voting_fit%>% predict(newdata = post_level[700001:800000,], summary = TRUE)
 post_predict9 <- voting_fit%>% predict(newdata = post_level[800001:900000,], summary = TRUE)
+# safe the first few prediction just in case
 save(post_predict, post_predict2, post_predict3, post_predict4, post_predict5, post_predict6, post_predict7, post_predict8, post_predict9, file = "outputs/post_predict2_9_v2.rda")
 post_predict10 <- voting_fit%>% predict(newdata = post_level[900001:1000000,], summary = TRUE)
 post_predict11 <- voting_fit%>% predict(newdata = post_level[1000001:1100000,], summary = TRUE)
@@ -284,22 +315,29 @@ post_predict13 <- voting_fit%>% predict(newdata = post_level[1200001:1300000,], 
 post_predict14 <- voting_fit%>% predict(newdata = post_level[1300001:1400000,], summary = TRUE)
 post_predict15 <- voting_fit%>% predict(newdata = post_level[1400001:1500000,], summary = TRUE)
 post_predict16 <- voting_fit%>% predict(newdata = post_level[1500001:nrow(post_level),], summary = TRUE)
+# save the rest of the prediction
 save(post_predict10, post_predict11, post_predict12, post_predict13, post_predict14, post_predict15, post_predict16, file = "outputs/post_predict10_16_v2.rda")
 ```
 
 
 ```{r, echo=FALSE, results='hide', messeage = FALSE}
+# load the prediction from both files saved above
 load(file = "outputs/post_predict2_9_v2.rda")
 load(file = "outputs/post_predict10_16_v2.rda")
+# combine all the prediction into one since we separated them at first
 post_predict_total <- as.data.frame(rbind(post_predict, post_predict2, post_predict3, post_predict4, post_predict5, post_predict6, post_predict7, post_predict8, post_predict9, post_predict10, post_predict11, post_predict12, post_predict13, post_predict14, post_predict15, post_predict16))
+# combine the prediction with the original post-stratified data
 post_predict_level <- cbind(post_level, post_predict_total)
 
+# convert the probabilties to the candidates > 0.5 --> Joe Biden < 0.5 --> Donald Trump
 post_predict_level <- cbind(post_predict_level, ifelse(post_predict_level$Estimate>0.5, "Joe Biden", "Donald Trump"))
+# change the column name
 colnames(post_predict_level)[12] <- "vote"
 ```
 
 
 ```{r, echo=FALSE, results='hide', message = FALSE}
+# plot the comparison of the voting situation of both data
 ind_race <- ind_level %>%
   group_by(vote_2020, race_ethnicity) %>%
   summarise(n = n()) %>%
@@ -312,6 +350,7 @@ post_predict_race <- post_predict_level %>%
   mutate(PROB = n/sum(n), VAR = 'RACE', CAT = race_ethnicity) %>%
   ungroup()
 
+# assign the plot to a variable for future use 
 post_race_vote <- ggplot(data = post_predict_race, aes(x = as.factor(CAT), y = PROB, group = vote, linetype = vote, color = vote)) +
   geom_point(stat = "identity") + 
   geom_line() +
@@ -322,7 +361,8 @@ post_race_vote <- ggplot(data = post_predict_race, aes(x = as.factor(CAT), y = P
   labs(title = "Distribution of votes in ACS") +
   xlab("Race") +
   ylab("Proportion")
-  
+
+# assign the plot to a variable for future use 
 ind_race_vote <- ggplot(data = ind_race, aes(x = as.factor(CAT), y = PROB, group = vote_2020, linetype = vote_2020, color = vote_2020)) +
   geom_point(stat = "identity") + 
   geom_line() +
@@ -334,7 +374,7 @@ ind_race_vote <- ggplot(data = ind_race, aes(x = as.factor(CAT), y = PROB, group
   xlab("Race") +
   ylab("Proportion")
 
-# State
+# plot the comparison of the voting situation of both data
 ind_state <- ind_level %>%
   group_by(vote_2020, state) %>%
   summarise(n = n()) %>%
@@ -347,6 +387,7 @@ post_predict_state <- post_predict_level %>%
   mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = state) %>%
   ungroup()
 
+# assign the plot to a variable for future use 
 post_state_vote <- ggplot(data = post_predict_state, aes(x = as.factor(CAT), y = PROB, group = vote, linetype = vote, color = vote)) +
   geom_point(stat = "identity") + 
   geom_line() +
@@ -356,7 +397,8 @@ post_state_vote <- ggplot(data = post_predict_state, aes(x = as.factor(CAT), y =
   theme(axis.text.x = element_text(angle = 60, hjust = 1))+
   labs(title = "Distribution of votes in ACS Data") +
   xlab("States")
-  
+
+# assign the plot to a variable for future use 
 ind_state_vote <- ggplot(data = ind_state, aes(x = as.factor(CAT), y = PROB, group = vote_2020, linetype = vote_2020, color = vote_2020)) +
   geom_point(stat = "identity") + 
   geom_line() +
@@ -370,16 +412,20 @@ ind_state_vote <- ggplot(data = ind_state, aes(x = as.factor(CAT), y = PROB, gro
 ```
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
+# find the proportion of votes in each state for both candidates
 post_state_predict <- post_predict_level %>%
   group_by(state, vote) %>%
   summarise(n = n()) %>%
   mutate(prop = prop.table(n))
+# Extract one candidate for the calculation of electoral college votes
 biden <- post_state_predict[which(post_state_predict$vote == 'Joe Biden'),]
-
+# electoral college votes based on the states order in post_state_predict
 elec_college <- c(3, 9, 11, 6, 55, 9, 7, 3, 3, 29, 16, 4, 6, 4, 20, 11, 6, 8, 8, 11, 10, 4, 16, 10, 10, 6, 3, 15, 3, 5, 4, 14, 5, 6, 29, 18, 7, 7, 20, 4, 9, 3, 11, 38, 6, 13, 3, 12, 10, 5, 3)
 biden <- cbind(biden, elec_college)
 colnames(biden)[5] <- "elec_college_n"
+# filter out the losing states for Biden
 biden_elec <- biden[which(biden$prop >= 0.5),]
+# add up the electoral college vote
 sum(biden_elec$elec_college_n)
 ```
 
@@ -392,7 +438,8 @@ each individual's response. Each individual's eventual choice could depend on th
 information to some extend.
 
 This analysis process is fortunate enough to obtain two credible datasets, Democracy Fund + UCLA
-Nationscape Data and American Community Survey (ACS) Data. This allows us to perform logistic regression
+Nationscape Data (Tausanovitch, Chris and Lynn Vavreck. (2020)) and American Community Survey (ACS) Data
+(U.S. Census Bureau. (2012)). This allows us to perform logistic regression
 with Multilevel Modeling with Post-Stratification, which requires two datasets for this statistical
 method. The details for these methods will be elaborated in the following sections in the report.
 Browsing through numerous standard variables in both datasets, we decided to select the ones that would
@@ -438,9 +485,9 @@ construct the MRP model (Lauren Kennedya and Andrew Gelman (2020)):
 
 This report uses the datasets from Democracy Fund + UCLA Nationscape as our sampled dataset to reconstruct the American Community Survey Datasets. In this section, we will thoroughly discuss the purpose of each data and details about the data.
 
-## Democracy + UCLA Nationscape Data
+## Democracy + UCLA Nationscape Data 
 
-The first data that we are going to use is from Democracy Fund + UCLA Nationscape. It is a partnership
+The first data that we are going to use is from Democracy Fund + UCLA Nationscape (Tausanovitch, Chris and Lynn Vavreck. (2020)). It is a partnership
 between the Democracy Fund Voter Study Group and the University of California Los Angeles Political
 Scientist. Lucid provides the samples. Lucid is a market research platform that runs an online exchange
 for survey respondents. The population from the data covers from every county, congressional district to
@@ -487,6 +534,7 @@ get a sample that represents the population.
 The following table (Table 1) is how the data looks like. It contains the variables that we are using and the variables that are mentioned in the report. 
 
 ```{r how data looks, echo=FALSE}
+# a quick glance of the data
 kable(head(ind_level), caption = "First five observations of the Nationscape Data")
 ```
 
@@ -496,7 +544,7 @@ The details of the data will be introduced after we talk about the American Comm
 ## American Community Survey
 
 The post-stratification dataset that we are going to use is from the American Community Survey (ACS)
-Operations Plan. ACS aims to provide information to federal, state, and local governments. The ACS
+Operations Plan (U.S. Census Bureau. (2012)). ACS aims to provide information to federal, state, and local governments. The ACS
 samples include about 3 million households nationwide and one percent of group quarters population
 (places such as nursing homes, prisons, college dormitories, military barracks, juvenile institutions,
 and emergency and transitional shelters for people experience homelessness). However, due to hardware
@@ -528,6 +576,7 @@ it provides options such as "Two major races" and "Three or more major races." I
 analyze the race in detail, it would be hard for them to do the work.
 
 ```{r how data looks like, echo=FALSE}
+# a quick glance of the data
 kable(head(post_level), caption = "First five observations of the ACS Data")
 ```
 
@@ -554,10 +603,11 @@ has into these seven categories. The graph below shows the proportion of each ra
 types. We can see that both datasets follow a similar trend of the distribution for race and ethnicity.
 
 ```{r, fig.cap= "Distribution of Race and Ethnicity in both datasets", echo = FALSE, fig.width = 6, fig.height = 4}
+# called the assigned plot from above
 race
 ```
 
-- **Voting in 2020 (Nationscape)**: Next, we will discuss the essential modification on the Nationscape 
+- **Voting in 2020 (Nationscape; Figure 9 lower level )**: Next, we will discuss the essential modification on the Nationscape 
 data. The Nationscape data also talks about whom the respondents will vote for, Donald Trump or Joe 
 Biden. Those who cannot decide whom to vote for during the time taking the survey, which shows up as "I 
 am not sure/do not know" and "I would not vote," will be asked which candidate they are leaning towards.
@@ -574,6 +624,7 @@ difference in proportion could affect post-stratification prediction since there
 and ideological gap between younger and older generations.
 
 ```{r, fig.cap="Distribution of age groups", echo=FALSE, fig.width = 6, fig.height = 3}
+# called the assigned plot from above
 age
 ```
 
@@ -585,6 +636,7 @@ in the Nationscape data. The below graph shows the proportion of each household 
 Data Types. 
 
 ```{r, fig.cap="Distribution of Household Income for both datasets", echo= FALSE, fig.width = 6, fig.height = 3}
+# called the assigned plot from above
 income
 ```
 
@@ -601,6 +653,7 @@ similar distributions. Noticeably, the categories provided in the ACS data canno
 influence the voting results.
 
 ```{r, fig.cap="Distribution for education level for both datasets", echo = FALSE, fig.width = 6, fig.height = 4}
+# called the assigned plot from above
 education
 ```
 
@@ -611,6 +664,7 @@ the Nationscape Data and easy to represent. Lastly, the below graph is the distr
 datasets. We can see that they are identical.
 
 ```{r, fig.cap="Distribution of each state for both datasets", echo=FALSE, fig.width = 8, fig.height = 3}
+# called the assigned plot from above
 state
 ```
 
@@ -629,7 +683,7 @@ different gender, ages, races, and social statuses, these are the critical facto
 people cast their votes. Most importantly, the respondents' states cannot be neglected because some
 states support Republicans (Donald Trump) and some states that support Democratic (Joe Biden).
 
-The formula below is the general formula for logistic regression. The p represents the mean probability for the event that we are interested in. $\beta_0$ to $\beta_p$ are the estimates for the coefficients of the regression, where n represents number of the variables that we are going to use.
+The formula below is the general formula for logistic regression. The p represents the mean probability for the event that we are interested in. $\beta_0$ to $\beta_n$ are the estimates for the coefficients of the regression, where n represents number of the variables that we are going to use.
 
 $$
 \begin{aligned}
@@ -692,6 +746,7 @@ are using here is logistic regression and the error variance is not a parameter 
 Distribution, we will not consider this assumption.
 
 ```{r, fig.cap="Posterior Predictive Checks for convergence", message=FALSE, echo=FALSE, fig.width = 4, fig.height = 2}
+# plot the posterior predictive checks
 pp_check(voting_fit) +
   ggtitle("Posterior Predictive Checks") +
   xlab("Probability") +
@@ -758,6 +813,7 @@ log(\frac{\hat{p}}{1-\hat{p}}) & = \hat{\beta_0} + \hat{\beta}_{state}x_{state} 
 $$
 
 ```{r, echo=FALSE}
+# list out the shorter version of the coefficients
 fixed_effects <- as.data.frame(fixef(voting_fit))
 kable(rbind(tail(fixed_effects), head(fixed_effects)), caption = "Head and Tails of the coefficients of the estimates")
 ```
@@ -777,6 +833,7 @@ As we mentioned in the Model Section, we also tested on the accuracy of the mode
 (Table 4) below represents the accuracy and wrongly categorized predictions.
 
 ```{r, echo=FALSE}
+# Present teh confusion matrix
 kable(ConfusionMatrix, caption = "Confusion Matrix for the model")
 ```
 
@@ -790,6 +847,7 @@ would vote for Donal Trump. After categorizing them, we can see the total voting
 and Joe Biden (Table 5). 
 
 ```{r Popular vote counts, echo=FALSE}
+# create a table for popular votes
 votes <- as.data.frame(count(post_predict_level, vote))
 colnames(votes) <- c("Candidates", "Vote Counts")
 kable(votes, caption = "Vote Counts")
@@ -799,6 +857,7 @@ In addition, we also plot out the voting counts in each states (Figure 7) and th
 general and quick glance of the competitiveness in each state. 
 
 ```{r, fig.cap="Vote counts in each state", echo=FALSE, message=FALSE , fig.width = 7, fig.height = 3}
+# plot the vote counts in each state
 ggplot(post_state_predict, aes(state, n, fill = vote)) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_manual(values = c("blue", "red")) + 
@@ -810,6 +869,7 @@ ggplot(post_state_predict, aes(state, n, fill = vote)) +
 ```
 
 ```{r heat map, fig.cap="Head Map for different states", fig.width = 5, fig.height = 3, echo=FALSE}
+# plot the heatmap for each states
 plot_usmap(data = biden, values = "prop", color = "blue") +
   scale_fill_continuous(
     low = "red", high = "blue1", name = "Trump (Red) or Biden (Blue)", label = scales::comma
@@ -824,10 +884,12 @@ post-stratification for our prediction. We would want to take a look of the diff
 datasets in the states (Figure 9) and the race level (Figure 10). 
 
 ```{r state and race level, fig.cap="Distribution of votes in different states for two datasets", echo = FALSE, , fig.width = 7, fig.height = 4}
+# called the plots that were assigned to variables and put them into one graph 
 grid.arrange(post_state_vote, ind_state_vote, ncol = 1)
 ```
 
 ```{r, fig.cap="Distribution of votes in races for two datasets", echo = FALSE,, fig.width = 6, fig.height = 4}
+# called the plots that were assigned to variables and put them into one graph 
 grid.arrange(post_race_vote, ind_race_vote, nrow = 1)
 ```
 
@@ -900,9 +962,14 @@ As the data section stated, there are weekly surveys for the Nationscape Data. I
 
 # References
 
+## Data Cleaning Code Adapted From
+
+- Rohan Alexander and Samantha Caetano (2020) 01-data_cleaning-survey.R
+- Rohan Alexander and Samantha Caetano (2020) 01-data_cleaning-survey-post-strat.R
+
 ## Survey/Data Source 
 
-- Tausanovitch, Chris and Lynn Vavreck . 2020 . Democracy Fund + UCLA Nationscape, October 10-17,
+- Tausanovitch, Chris and Lynn Vavreck. (2020). Democracy Fund + UCLA Nationscape, October 10-17,
   2019 (version 20200814) . Retrieved from [URL] .
 
 - U.S. Census Bureau. (2012). 2009-2011 American Community Survey 3-year Public Use Microdata
@@ -973,6 +1040,7 @@ https://bookdown.org/MathiasHarrer/Doing_Meta_Analysisin_R/bayesian-meta-analysi
 
 # Appendix
 ```{r, echo = FALSE}
+# full table for the coefficients
 kable(exp(fixef(voting_fit)), caption = "Parameter Estimate for our model")
 ```
 

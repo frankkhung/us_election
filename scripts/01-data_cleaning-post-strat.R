@@ -1,12 +1,13 @@
 #### Preamble ####
-# Purpose: Prepare and clean the survey data downloaded from [...UPDATE ME!!!!!]
-# Author: Rohan Alexander and Sam Caetano [CHANGE THIS TO YOUR NAME!!!!]
-# Data: 22 October 2020
-# Contact: rohan.alexander@utoronto.ca [PROBABLY CHANGE THIS ALSO!!!!]
+# Purpose: Prepare and clean the survey data downloaded from https://usa.ipums.org/usa-action/variables/group
+# Author: Chien-Che Hung
+# Data: 02 November 2020
+# Contact: chienche.hung@mail.utoronto.ca
 # License: MIT
 # Pre-requisites: 
-# - Need to have downloaded the ACS data and saved it to inputs/data
-# - Don't forget to gitignore it!
+# - Need to have downloaded the ACS (https://usa.ipums.org/usa-action/variables/group) data and saved it to inputs/data
+# - Follow the README file in the Github Repository: https://github.com/frankkhung/us_election
+# - Any forms of this dataset should not be uploaded to any platform!
 
 
 #### Workspace setup ####
@@ -14,13 +15,10 @@ library(haven)
 library(tidyverse)
 # Read in the raw data. 
 raw_data <- read_dta("inputs/data/usa_00004.dta")
-# Add the labels
+# Add the labels since it was in dta format
 raw_data <- labelled::to_factor(raw_data)
 
-# Just keep some variables that may be of interest (change 
-# this depending on your interests)
-names(raw_data)
-
+# selec the variables that we are interested in
 reduced_post <- 
   raw_data %>% 
   select(stateicp,
@@ -36,38 +34,40 @@ reduced_post <-
 
 #### Edit each variable to match the individual level data ####
 
-# sex/gender
-
+# sex/gender (it is in uppercase in Nationscape Data)
 reduced_post$sex[raw_data$sex == "male"] <- "Male"
 reduced_post$sex[raw_data$sex == "female"] <- "Female"
 
 # change the state names to abbreviation 
 reduced_post$stateicp <- tolower(reduced_post$stateicp)
 state <- tolower(state.name) 
+# in the state function, there is no district of columbia since they 
+# technicially is not a state. We will have to add time manually
 state <- append(state, "district of columbia")
 state.abb <- append(state.abb, "DC")
 reduced_post$stateicp <- state.abb[match(reduced_post$stateicp , state)]
 
 # birthplace
+# Whether born in the united states or not
 to <- replicate(length(states), "The United States")
 map  = setNames(to, states)
 reduced_post$bpl <- map[reduced_post$bpl]
 reduced_post$bpl <- reduced_post$bpl %>% replace_na("Another country") 
 
 # change age into ranges
+# same as Nationscape data, it was originally in numbers. It would be easier to analyze to make in in categories
 reduced_post$age <- as.integer(reduced_post$age)
-
-#remove age lower than 18 (voting age)
+# remove age lower than 18 (voting age) since it is a census data and people who are under 18 are not available to vote.
+# Thus, we are removing unreliable observations
 reduced_post <- reduced_post[!is.na(reduced_post$age),]
 reduced_post <- reduced_post[!(reduced_post$age < 18),]
-
 labs <- c(paste(seq(0, 95, by = 10), seq(0 + 10 - 1, 100 - 1, by = 10),
                 sep = "-"), paste(100, "+", sep = ""))
 reduced_post$age <- cut(reduced_post$age, breaks = c(seq(0, 100, by = 10), Inf), labels = labs, right = FALSE)
 reduced_post$age <- as.character(reduced_post$age)
 
 
-# change education 
+# change education since the education in this data is relatively more detailed the the Nationscape 
 reduced_post$educd[reduced_post$educd == "1 or more years of college credit, no degree"] <- "Completed some college, but no degree"
 reduced_post$educd[reduced_post$educd == "12th grade, no diploma"] <- "Completed some high school"
 reduced_post$educd[reduced_post$educd == "associate's degree, type not specified"] <- "Associate Degree"
@@ -93,7 +93,8 @@ reduced_post$educd[reduced_post$educd == "professional degree beyond a bachelor'
 reduced_post$educd[reduced_post$educd == "regular high school diploma"] <- "High school graduate"
 reduced_post$educd[reduced_post$educd == "some college, but less than 1 year"] <- "Completed some college, but no degree"
 
-# set cateories for income levels
+# set cateories for income levels. The income were in numbers and the income variable in the Nationscape data is in categories
+# thus we have to change this part
 reduced_post <- reduced_post[!is.na(reduced_post$inctot),]
 reduced_post$inctot<- as.integer(reduced_post$inctot)
 ranges <- c(-1, 14999, 19999, 24999, 29999, 34999, 39999, 44999, 49999, 54999, 59999, 64999, 69999, 74999, 79999,
@@ -109,15 +110,17 @@ reduced_post$inctot <- as.character(reduced_post$inctot)
 reduced_post <- reduced_post[!is.na(reduced_post$inctot),]
 
 
-# clean up race and ethnicity
+# clean up race and ethnicity. since three or more major races and two major races are ambiguous and have to function
 reduced_post$race[reduced_post$race == "three or more major races"] <- NA
 reduced_post$race[reduced_post$race == "two major races"] <- NA
 reduced_post <- reduced_post[!is.na(reduced_post$race),]
 
-# change column names
+# change column names in order to match with the Nationscape data
 col <- c("state", "gender", "age", "race_ethnicity", "foreign_born", "education", "employment", "household_income")
 colnames(reduced_post) <- col
 
+# Save the dataset into a csv and used in other analysis
 write_csv(reduced_post, "inputs/data/post_level.csv")
+# remove data that wont be used
 rm(reduced_post)
 rm(raw_data)
