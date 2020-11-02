@@ -29,7 +29,7 @@ After getting both datasets, you can open up the "data_analysis_script.Rmd" to s
 
 ## Files Introduction
 - data_analysis_script.Rmd: Contains the analysis code in R and the raw file for the report
-- data_analysis_script.pdf: The official report for this analysis
+- data_analysis.pdf: The official report for this analysis
 - Input: your data will be in this file and check that you have these two files:
   - ind_level.csv
   - post_level.csv
