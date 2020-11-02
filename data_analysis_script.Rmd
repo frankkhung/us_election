@@ -1,0 +1,970 @@
+---
+title: "US election"
+author: "Chien-Che Hung"
+date: "11/2/2020"
+abstract: |
+  In this report, we will be predicting the winner for 
+  the 2020 United States Election. We utilized two datasets, 
+  Democracy Fund + UCLA Nationscape Data and American 
+  Community Survey (ACS) Data, to perform Multilevel Modeling 
+  with Post-Stratification (MRP). The model that we are using 
+  in this analysis is Logistic Regression, since the response 
+  variable that we have is binary, Joe Biden or Donald Trump. 
+  After our prediction on the post-stratification data (ACS) 
+  data, we can see that Joe Biden wins the popular vote and 
+  the electoral vote. In addition to the voting prediction, we
+  also find out that Race, Income Level, and State Residency
+  contribute primarily to a person's voting choice.
+
+  **Keywords**: Forecasting; US 2020 Election; Trump; Biden;
+  Multilevel Regression 
+  
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(brms)
+library(tidyverse)
+library(reshape2)
+library(bayesplot)
+library(ggplot2)
+library(knitr)
+library(brms)
+library(tidybayes)
+library(ROCR)
+library(usmap)
+library(gridExtra)
+
+options(future.globals.maxSize = 4000 * 1024^10)
+
+# get the data
+ind_level <- read_csv("inputs/data/ind_level.csv")
+ind_level <- ind_level %>% 
+  select(vote_2020,
+         vote_2020_lean,
+         employment,
+         gender,
+         race_ethnicity,
+         household_income,
+         education,
+         state,
+         age) 
+post_level <- read_csv("inputs/data/post_level.csv")
+post_level <- 
+  post_level %>% 
+  select(employment,
+         gender,
+         race_ethnicity,
+         household_income,
+         education,
+         state,
+         age) 
+```
+
+```{r, echo=FALSE, eval=FALSE}
+voting_fit <- brm(vote_2020 ~ 1 + gender + age + race_ethnicity + household_income + education + state, family = bernoulli(link = "logit"), prior = set_prior("normal(0, 10)", class = "b"), seed = 123, data = ind_level, core = 4)
+
+save(voting_fit, file = "outputs/voting_fit.rda")
+```
+
+
+```{r, echo=FALSE, results='hide'}
+load(file = "outputs/voting_fit.rda")
+# Find the correct classification rate
+Prob <- predict(voting_fit, type = "response")
+ind_pred <- ifelse(Prob < 0.5, "Donald Trump", "Joe Biden")
+ConfusionMatrix <- table(ind_pred[,1], pull(ind_level,vote_2020))
+sum(diag(ConfusionMatrix))/sum(ConfusionMatrix)
+
+
+# Model Evaluation AUC curve 
+Prob <- predict(voting_fit, type = "response")
+Prob <- Prob[,1]
+Pred <- prediction(Prob, as.vector(pull(ind_level, vote_2020)))
+AUC <- performance(Pred, measure = "auc")
+AUC <- AUC@y.values[[1]]
+```
+
+
+```{r, results='hide', echo=FALSE, message=FALSE}
+# Plot the race comparison between post-stratification data and individual level data 
+
+post_race <- post_level %>%
+  group_by(race_ethnicity) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'POST', VAR = 'RACE', CAT = race_ethnicity) %>%
+  ungroup()
+
+ind_race <- ind_level %>%
+  group_by(race_ethnicity) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = race_ethnicity) %>%
+  ungroup()
+
+total_race <- rbind(post_race, ind_race)
+
+race <- ggplot(data = total_race, aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
+  geom_point(stat = "identity", colour = "black") + 
+  geom_line() +
+  theme_classic() +
+  labs(title = "Race Distributions", x = "Race", y = "Proportion") +
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+```{r, echo=FALSE, results='hide', message=FALSE}
+# Plot the sex comparison between post-stratification data and individual level data 
+
+post_gender <- post_level %>%
+  group_by(gender) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'POST', VAR = 'RACE', CAT = gender) %>%
+  ungroup()
+
+ind_gender <- ind_level %>%
+  group_by(gender) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = gender) %>%
+  ungroup()
+
+total_gender <- rbind(post_gender, ind_gender)
+
+gender <- ggplot(data = total_gender, 
+                 aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
+  geom_point(stat = "identity", colour = "black") + 
+  geom_line() +
+  theme_classic() +
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  labs(title = "Gender Distributions", x = "Gender", y = "Proportion") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+# Plot the age comparison between post-stratification data and individual level data 
+post_age <- post_level %>%
+  group_by(age) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'POST', VAR = 'RACE', CAT = age) %>%
+  ungroup()
+
+ind_age <- ind_level %>%
+  group_by(age) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = age) %>%
+  ungroup()
+
+total_age <- rbind(post_age, ind_age)
+
+age <- ggplot(data = total_age, aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
+  geom_point(stat = "identity", colour = "black") + 
+  geom_line() +
+  theme_classic() +
+  labs(title = "Age Distributions", x = "Age", y = "Proportion") +
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+# Plot the employment comparison between post-stratification data and individual level data 
+post_employment <- post_level %>%
+  group_by(employment) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'POST', VAR = 'RACE', CAT = employment) %>%
+  ungroup()
+
+ind_employment <- ind_level %>%
+  group_by(employment) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = employment) %>%
+  ungroup()
+
+total_employment <- rbind(post_employment, ind_employment)
+
+employment <- ggplot(data = total_employment, aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
+  geom_point(stat = "identity", colour = "black") + 
+  geom_line() +
+  theme_classic() +
+  labs(title = "Employment Distribution", x = "Employment", y = "Proportion") +
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+# Plot the education comparison between post-stratification data and individual level data 
+
+post_education <- post_level %>%
+  group_by(education) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'POST', VAR = 'RACE', CAT = education) %>%
+  ungroup()
+
+ind_education <- ind_level %>%
+  group_by(education) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = education) %>%
+  ungroup()
+
+total_education <- rbind(post_education, ind_education)
+
+education <- ggplot(data = total_education, 
+                    aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
+  geom_point(stat = "identity", colour = "black") + 
+  geom_line() +
+  theme_classic() +
+  labs(title = "Education Distribution", x = "Education Types", y = "Proportion") +
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+# Plot the state comparison between post-stratification data and individual level data 
+
+post_state<- post_level %>%
+  group_by(state) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'POST', VAR = 'RACE', CAT = state) %>%
+  ungroup()
+
+ind_state <- ind_level %>%
+  group_by(state) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = state) %>%
+  ungroup()
+
+total_state <- rbind(post_state, ind_state)
+
+state <- ggplot(data = total_state, aes(x = as.factor(CAT), y = PROB, group = as.factor(TYPE), linetype = as.factor(TYPE))) +
+  geom_point(stat = "identity", colour = "black") + 
+  geom_line() +
+  theme_classic() +
+  labs(title = "State Distributions", x = "State", y = "Proportion") +
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+# Plot the income comparison between post-stratification data and individual level data 
+
+post_household_income<- post_level %>%
+  group_by(household_income) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'POST', VAR = 'RACE', CAT = household_income) %>%
+  ungroup()
+
+ind_household_income <- ind_level %>%
+  group_by(household_income) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = household_income) %>%
+  ungroup()
+
+total_household_income <- rbind(post_household_income, ind_household_income)
+
+income <- ggplot(data = total_household_income, aes(x = as.factor(CAT), y = PROB, group = TYPE, linetype = TYPE)) +
+  geom_point(stat = "identity", colour = "black") + 
+  geom_line() +
+  theme_classic() +
+  labs(title = "Income Distribution", x = "Income Categories", y = "Proportion") +
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+```
+
+
+
+
+```{r, echo=FALSE, eval=FALSE, results='hide'}
+rm(ind_level)
+nrow(post_level)/2
+post_predict <- voting_fit%>% predict(newdata = post_level[1:100000,], summary = TRUE)
+post_predict2 <- voting_fit%>% predict(newdata = post_level[100001:200000,], summary = TRUE)
+post_predict3 <- voting_fit%>% predict(newdata = post_level[200001:300000,], summary = TRUE)
+post_predict4 <- voting_fit%>% predict(newdata = post_level[300001:400000,], summary = TRUE)
+post_predict5 <- voting_fit%>% predict(newdata = post_level[400001:500000,], summary = TRUE)
+post_predict6 <- voting_fit%>% predict(newdata = post_level[500001:600000,], summary = TRUE)
+post_predict7 <- voting_fit%>% predict(newdata = post_level[600001:700000,], summary = TRUE)
+post_predict8 <- voting_fit%>% predict(newdata = post_level[700001:800000,], summary = TRUE)
+post_predict9 <- voting_fit%>% predict(newdata = post_level[800001:900000,], summary = TRUE)
+save(post_predict, post_predict2, post_predict3, post_predict4, post_predict5, post_predict6, post_predict7, post_predict8, post_predict9, file = "outputs/post_predict2_9_v2.rda")
+post_predict10 <- voting_fit%>% predict(newdata = post_level[900001:1000000,], summary = TRUE)
+post_predict11 <- voting_fit%>% predict(newdata = post_level[1000001:1100000,], summary = TRUE)
+post_predict12 <- voting_fit%>% predict(newdata = post_level[1100001:1200000,], summary = TRUE)
+post_predict13 <- voting_fit%>% predict(newdata = post_level[1200001:1300000,], summary = TRUE)
+post_predict14 <- voting_fit%>% predict(newdata = post_level[1300001:1400000,], summary = TRUE)
+post_predict15 <- voting_fit%>% predict(newdata = post_level[1400001:1500000,], summary = TRUE)
+post_predict16 <- voting_fit%>% predict(newdata = post_level[1500001:nrow(post_level),], summary = TRUE)
+save(post_predict10, post_predict11, post_predict12, post_predict13, post_predict14, post_predict15, post_predict16, file = "outputs/post_predict10_16_v2.rda")
+```
+
+
+```{r, echo=FALSE, results='hide', messeage = FALSE}
+load(file = "outputs/post_predict2_9_v2.rda")
+load(file = "outputs/post_predict10_16_v2.rda")
+post_predict_total <- as.data.frame(rbind(post_predict, post_predict2, post_predict3, post_predict4, post_predict5, post_predict6, post_predict7, post_predict8, post_predict9, post_predict10, post_predict11, post_predict12, post_predict13, post_predict14, post_predict15, post_predict16))
+post_predict_level <- cbind(post_level, post_predict_total)
+
+post_predict_level <- cbind(post_predict_level, ifelse(post_predict_level$Estimate>0.5, "Joe Biden", "Donald Trump"))
+colnames(post_predict_level)[12] <- "vote"
+```
+
+
+```{r, echo=FALSE, results='hide', message = FALSE}
+ind_race <- ind_level %>%
+  group_by(vote_2020, race_ethnicity) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), VAR = 'RACE', CAT = race_ethnicity) %>%
+  ungroup()
+
+post_predict_race <- post_predict_level %>%
+  group_by(vote, race_ethnicity) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), VAR = 'RACE', CAT = race_ethnicity) %>%
+  ungroup()
+
+post_race_vote <- ggplot(data = post_predict_race, aes(x = as.factor(CAT), y = PROB, group = vote, linetype = vote, color = vote)) +
+  geom_point(stat = "identity") + 
+  geom_line() +
+  scale_color_manual(values=c('red', 'blue')) +
+  scale_linetype_manual(values = c("solid", "longdash")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  labs(title = "Distribution of votes in ACS") +
+  xlab("Race") +
+  ylab("Proportion")
+  
+ind_race_vote <- ggplot(data = ind_race, aes(x = as.factor(CAT), y = PROB, group = vote_2020, linetype = vote_2020, color = vote_2020)) +
+  geom_point(stat = "identity") + 
+  geom_line() +
+  scale_color_manual(values=c('red', 'blue')) +
+  scale_linetype_manual(values = c("solid", "longdash")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))  + 
+  labs(title = "Distribution of votes in Nationscape") +
+  xlab("Race") +
+  ylab("Proportion")
+
+# State
+ind_state <- ind_level %>%
+  group_by(vote_2020, state) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = state) %>%
+  ungroup()
+
+post_predict_state <- post_predict_level %>%
+  group_by(vote, state) %>%
+  summarise(n = n()) %>%
+  mutate(PROB = n/sum(n), TYPE = 'IND', VAR = 'RACE', CAT = state) %>%
+  ungroup()
+
+post_state_vote <- ggplot(data = post_predict_state, aes(x = as.factor(CAT), y = PROB, group = vote, linetype = vote, color = vote)) +
+  geom_point(stat = "identity") + 
+  geom_line() +
+  scale_color_manual(values=c('red', 'blue')) +
+  scale_linetype_manual(values = c("solid", "longdash")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  labs(title = "Distribution of votes in ACS Data") +
+  xlab("States")
+  
+ind_state_vote <- ggplot(data = ind_state, aes(x = as.factor(CAT), y = PROB, group = vote_2020, linetype = vote_2020, color = vote_2020)) +
+  geom_point(stat = "identity") + 
+  geom_line() +
+  scale_color_manual(values=c('red', 'blue')) +
+  scale_linetype_manual(values = c("solid", "longdash")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))  + 
+  labs(title = "Distribution of votes in Nationscape Data") +
+  xlab("States") +
+  ylab("Proportion")
+```
+
+```{r, echo=FALSE, results='hide', message=FALSE}
+post_state_predict <- post_predict_level %>%
+  group_by(state, vote) %>%
+  summarise(n = n()) %>%
+  mutate(prop = prop.table(n))
+biden <- post_state_predict[which(post_state_predict$vote == 'Joe Biden'),]
+
+elec_college <- c(3, 9, 11, 6, 55, 9, 7, 3, 3, 29, 16, 4, 6, 4, 20, 11, 6, 8, 8, 11, 10, 4, 16, 10, 10, 6, 3, 15, 3, 5, 4, 14, 5, 6, 29, 18, 7, 7, 20, 4, 9, 3, 11, 38, 6, 13, 3, 12, 10, 5, 3)
+biden <- cbind(biden, elec_college)
+colnames(biden)[5] <- "elec_college_n"
+biden_elec <- biden[which(biden$prop >= 0.5),]
+sum(biden_elec$elec_college_n)
+```
+
+# Introduction
+
+As the 2020 United States Election is approaching, we would like to know who is more likely to be the
+next president of the United States, Donald Trump or Joe Biden. Even though whom to vote for in the
+election is a very subjective question, we can use some facts, such as demographic questions, to predict
+each individual's response. Each individual's eventual choice could depend on this background
+information to some extend.
+
+This analysis process is fortunate enough to obtain two credible datasets, Democracy Fund + UCLA
+Nationscape Data and American Community Survey (ACS) Data. This allows us to perform logistic regression
+with Multilevel Modeling with Post-Stratification, which requires two datasets for this statistical
+method. The details for these methods will be elaborated in the following sections in the report.
+Browsing through numerous standard variables in both datasets, we decided to select the ones that would
+influence a person's choice of voting: State Residency, Gender, Age, Education, Income Level, and
+Employment Status. These variables would be positively correlated to their choice of candidate. Other
+than those six variables, we are going to use the answer to the question "If the election were going to
+held now and the Democratic nominee was Joe Biden, and the Republican nominee was Donald Trump, would
+you vote for....?" in the Nationscape Data to construct the model for the prediction on the ACS Data.
+
+Several interesting conclusions can be drawn from our analysis. Firstly, the effects of different
+variables on probability for a person to vote. For example, do races contribute positively or negatively
+to the probability of voting for Joe Biden? After obtaining the prediction based on the Nationscape
+data, we will determine the popular vote for this election. Secondly, as the race factor predominantly
+affects the election, it could suggest the candidates' policy direction. For instance, construct
+policies towards certain income levels of people. Given that in 2016, Hillary Clinton won the popular
+vote and lost the electoral college vote. We will also consider which candidate wins in the Electoral
+College.
+
+In this report, we will talk about the data where we thoroughly talk about how the data was obtained,
+the surveys were asked, and the reasoning behind the variables that we chose. After the Data section, we
+will discuss the modeling method that we use and why we choose this specific model. The Result section
+and the Discussion section come after. We talk about the results of our statistical analysis and what
+conclusions can be made through the results.
+
+# Data
+## Reasons for Two Datasets
+
+There are two different types of datasets being used in this report and analysis. In this analysis, we
+utilize the statistical technique called Multi-level Modeling with Post-Stratification (MRP). We can
+think of this modeling method instead of making assumptions about how the observed sample was produced
+from the population. We make assumptions about how the observed sample can be used to reconstruct the
+population. Also, it uses an individual model (Nationscape Data) to adjust the population (ACS Data)
+estimates, which can be understood as a weighted average from all possible combinations of the
+attributes as we will talk about the variables being used in the following sub-sections. Our total
+combinations (cells) of $51*2*9*7*10*3*24 = 4626720$; these cells will be predicted after the model for
+Nationscape Data is built. After introducing the brief idea for MRP, the following are the steps to
+construct the MRP model:
+
+1. Collect demographic features during the survey collection stage and identify the post-stratification data.
+2. Pick out the shared variables and the variable that we are going to train on.
+3. Estimate the parameters in the model.
+4. Estimate the post-stratification values from the estimated model.
+
+This report uses the datasets from Democracy Fund + UCLA Nationscape as our sampled dataset to reconstruct the American Community Survey Datasets. In this section, we will thoroughly discuss the purpose of each data and details about the data.
+
+## Democracy + UCLA Nationscape Data
+
+The first data that we are going to use is from Democracy Fund + UCLA Nationscape. It is a partnership
+between the Democracy Fund Voter Study Group and the University of California Los Angeles Political
+Scientist. Lucid provides the samples. Lucid is a market research platform that runs an online exchange
+for survey respondents. The population from the data covers from every county, congressional district to
+mid-sized U.S. cities. It aims to understand people's opinions on the 2020 election. Nationscape
+conducts weekly surveys and an estimated 500,000 interviews of Americans from July 2019 through December
+2020. While the population for this survey is every American eligible to vote, the sampling frame would
+be the "suppliers" on the Lucid Marketplace Platform. Normally, if the interviews of this sruvey
+conducted through random sampling through phone numbers, the cost of could be unimaginable. However,
+since Nationscape conduct the survey and obtains the survey from Lucid, the cost would be relatively
+low.
+
+In the study, the sample would be those who have access to the Lucid Marketplace Platform on a networked
+computer or mobile device as the mode of the interview is the online survey. The sampling method on this
+platform is called Programmatic Sampling, which automates buying and selling the sample [citation].
+Using this method, Nationscape could get an enormous amount of data with less cost and human resources.
+Thus, the platform samples accept the selection from the party that creates the survey and willing to
+survey the platform. There are roughly 12% of the selected people or groups declined to do the survey, 
+and 5% of the people stopped doing the survey half-way. These respondents are dropped and not included
+in the data. However, even though the survey asks the respondents about their household income levels,
+they have the option not to answer the question. To deal with this question's non-responses, targets for
+response categories are based on American Community Survey responses multiplied by the proportion chosen
+to answer the income question.
+
+As we look deeper into the survey, we can see that it covers a wide range of questions, including
+questions about respondents' attitudes, behaviors, and facts about their lives. These detailed questions
+could be a strength during the step of the analysis. However, the advantages could also be weaknesses.
+For instance, "How much do you trust the people in your neighborhood?" The answer to this question could
+depend on how the respondent defines their neighborhoods. Alternatively, some questions might make the
+respondents unwilling to tell the truth about unwillingness or embarrassment, such as "Did anyone in
+your household get food stamps or use a food stamp benefit card at any time during 2018?". Even if
+people speak the truth regarding these topics, the Lucid Marketplace Platform sampling method might not
+get a sample that represents the population.
+
+As we look deeper into the survey, we can see that it covers a wide range of questions, including
+questions about respondents' attitudes, behaviors, and facts about their lives. These detailed questions
+could be a strength during the step of the analysis. However, the advantages could also be weaknesses.
+For instance, "How much do you trust the people in your neighborhood?" The answer to this question could
+depend on how the respondent defines their neighborhoods. Alternatively, some questions might make the
+respondents unwilling to tell the truth about unwillingness or embarrassment, such as "Did anyone in
+your household get food stamps or use a food stamp benefit card at any time during 2018?". Even if
+people speak the truth regarding these topics, the Lucid Marketplace Platform sampling method might not
+get a sample that represents the population.
+
+The following table (Table 1) is how the data looks like. It contains the variables that we are using and the variables that are mentioned in the report. 
+
+```{r how data looks, echo=FALSE}
+kable(head(ind_level), caption = "First five observations of the Nationscape Data")
+```
+
+The details of the data will be introduced after we talk about the American Community Survey
+(Post-Stratification Data).
+
+## American Community Survey
+
+The post-stratification dataset that we are going to use is from the American Community Survey (ACS)
+Operations Plan. ACS aims to provide information to federal, state, and local governments. The ACS
+samples include about 3 million households nationwide and one percent of group quarters population
+(places such as nursing homes, prisons, college dormitories, military barracks, juvenile institutions,
+and emergency and transitional shelters for people experience homelessness). However, due to hardware
+restrictions, we cannot predict 3 million households at once based on our Nationscape model. We cut down
+the sample size to 1550789 households. To accomplish this, smaller random subsets (around 50% of the
+original dataset in this case) of the entire data is being selected.
+
+The sampling method for ACS is called systematic sampling. This method is usually done through the
+paper. Unlike Simple Random Sample Without Replacement (SRSWOR), systematic sampling considers the
+respondents' physical settings, where the respondents are arranged in a sequence. After choosing a
+random starting point of sampling, the samples will be collected once after a specific interval. The
+interval is decided by $\frac{Population}{Sample}$. For ACS, to reach the respondents, it utilized the
+addresses from Master Address File (MAF). After obtaining the addresses, the samples would receive an
+ACS survey at the beginning of the month. To deal with the non-respondents, Computer Assisted Telephone
+Interview would be conducted one month later. If there are still no responses from the selected
+respondent, a computer-assisted personal interview (CAPI) would be conducted for one-third of the
+non-respondents to either physical mail or telephone. While the American Community Survey population is
+all the Americans, since this survey type is like a census survey, the sampling frame would be the
+addresses in the MAF. Other than those strategies mentioned earlier to deal with the non-response, ACS
+also over-samples the low mail response areas and small population groups to reduce the variation. Since
+there is a correlation between low mail response and minority populations, oversampling for low mail
+responses may address providing reliable estimates for small population groups.
+
+One of the ACS survey's critical features is that ACS Operation Plan detailed assesses the needs for
+each question and work with other agencies on their data needs. Thus, the ACS survey provides a wide
+range of questions ranging from household information, family relationship, migration status to
+occupation status. As a detail, as the data is, there are still some flaws. For example, for the race,
+it provides options such as "Two major races" and "Three or more major races." If the analysts want to
+analyze the race in detail, it would be hard for them to do the work.
+
+```{r how data looks like, echo=FALSE}
+kable(head(post_level), caption = "First five observations of the ACS Data")
+```
+
+In Table 2, we can see that to match with the variables in the Individual Level Nationscape data, we 
+also pick the ones that are being used for the Nationscape. Thus, state, gender, race, birthplace, 
+education, employment status, and household income will be picked for post-stratification prediction. 
+The modification applied to the data will be discussed in the next subsection.
+
+
+## Modifications and Visualization on Nationscape Data and ACS Data
+
+This section will talk about the modifications being made on both data and the comparison of both 
+datasets. The main reason for the modification is that to make the prediction, the variables and the 
+datasets' categories need to be identical.
+
+- **Race and Ethnicity (Nationscape; Figure 1)**: In the Nationscape Dataset, race and ethnicity are separated 
+into White, American Indian or Alaska Native African American, Asian with seven categories, Pacific 
+Islander with four categories, and some other race, which has a total of 15 categories. Initially, there
+are categories such as "three or more major races" and "two major races" in the ACS data. However, since
+we do not know the races' specifics in those options, we drop the observations that contain two 
+responses. This leaves race and ethnicity in the ACS data with seven categories. Because ACS's race and 
+ethnicity variable only have seven categories, we re-distributed the 15 categories that Nationscape data
+has into these seven categories. The graph below shows the proportion of each race with different data 
+types. We can see that both datasets follow a similar trend of the distribution for race and ethnicity.
+
+```{r, fig.cap= "Distribution of Race and Ethnicity in both datasets", echo = FALSE, fig.width = 6, fig.height = 4}
+race
+```
+
+- **Voting in 2020 (Nationscape)**: Next, we will discuss the essential modification on the Nationscape 
+data. The Nationscape data also talks about whom the respondents will vote for, Donald Trump or Joe 
+Biden. Those who cannot decide whom to vote for during the time taking the survey, which shows up as "I 
+am not sure/do not know" and "I would not vote," will be asked which candidate they are leaning towards.
+Thus, as we combined these two columns into one, we can know more about the support rate and find out 
+some hidden voters who do not voice their opinions. The distribution of this variable will be discussed 
+after the prediction from the post-stratification data is being made.
+
+- **Age (Nationscape and ACS Data; Figure 2)**: For the respondents' age in both datasets, they are presented by 
+integers rather than categories. Thus, we put the respondents' age in both datasets into their 
+corresponding age groups ranging from 10-99 with an interval of ten years. The graph below shows the 
+proportions of different age groups for different datasets. We can see that post-stratification data 
+(ACS data) has a lower relatively lower proportion in the age range "20-29", "30-39", and "40-49." The 
+difference in proportion could affect post-stratification prediction since there tend to have a partisan
+and ideological gap between younger and older generations.
+
+```{r, fig.cap="Distribution of age groups", echo=FALSE, fig.width = 6, fig.height = 3}
+age
+```
+
+\newpage
+
+- **Household Income (ACS Data; Figure 3)**: In the household income section, the Nationscape data's income is in
+categories. Because the ACS data's income is in integer form, we put the income according to the levels
+in the Nationscape data. The below graph shows the proportion of each household income for different
+Data Types. 
+
+```{r, fig.cap="Distribution of Household Income for both datasets", echo= FALSE, fig.width = 6, fig.height = 3}
+income
+```
+
+\newpage
+
+- **Education (ACS Data; Figure 4)**: In the Nationscape data, it has a broader definition of categories. For 
+example, there are separate categories for ACS Data for grades, from grade 1 to grade 11. On the other 
+hand, Nationscape generalizes it into "3rd Grade or Less" and "Middle School - Grades 4-8." Since there 
+is no way for us to know the specifics inside "3rd Grade or Less" and "Middle School - Grade 4-8", we 
+can only make the ACS education categories into a more general form. The graph below shows the 
+proportion of each education types for both datasets. We can also see that both distributions have 
+similar distributions. Noticeably, the categories provided in the ACS data cannot be categorized in the 
+"completed some graduate, but no degree." However, we decide to keep this category as this might also 
+influence the voting results.
+
+```{r, fig.cap="Distribution for education level for both datasets", echo = FALSE, fig.width = 6, fig.height = 4}
+education
+```
+
+
+- **State (ACS Data; Figure 5)**: In the ACS Data, the states' representation is in their full name lower case 
+form. Thus, we need to convert it to the states' abbreviations, which would fit the representation in 
+the Nationscape Data and easy to represent. Lastly, the below graph is the distribution of states in two
+datasets. We can see that they are identical.
+
+```{r, fig.cap="Distribution of each state for both datasets", echo=FALSE, fig.width = 8, fig.height = 3}
+state
+```
+
+\newpage
+
+# Model
+## Post-Stratification
+
+From the previous sections, we mentioned that we would use multi-level modeling with post-stratification
+to predict who will win the 2020 United States Election. Before the post-stratification stage, we are
+going to model the individual level (Nationscape Data). Since the response variable result would be
+binary, Donald Trump or Joe Biden, we will use logistic regression. We are interested in how state,
+gender, age, race and ethnicity, education, employment status, and household income affect people's
+decision on voting for candidates. Since different candidates would have different policies for
+different gender, ages, races, and social statuses, these are the critical factors that would affect how
+people cast their votes. Most importantly, the respondents' states cannot be neglected because some
+states support Republicans (Donald Trump) and some states that support Democratic (Joe Biden).
+
+The formula below is the general formula for logistic regression. The p represents the mean probability for the event that we are interested in. $\beta_0$ to $\beta_p$ are the estimates for the coefficients of the regression, where n represents number of the variables that we are going to use.
+
+$$
+\begin{aligned}
+log(\frac{p}{1-p}) = \beta_0 + \beta^TX = \beta_0 + \beta_1x_1 + ... + \beta_nx_n
+\end{aligned}
+$$
+
+In addition to logistic regression, we are going to utilize Bayesian Inference. Bayesian Regression Model is based on the application Bayes Theorem:
+
+$$
+\begin{aligned}
+P(\theta|X, \alpha) = \frac{P(X|\theta, \alpha)P(\theta,\alpha)}{P(X|\alpha)P(\alpha)} \propto p(X|\theta, \alpha)
+\end{aligned}
+$$
+
+From the equation above, $P(\theta| X, \alpha)$  is the posterior probability. In order worlds the
+probability of $\theta$ given $X, \alpha$. $P(X|\theta, \alpha)$ is the probability of observing $X$
+given $\theta, \alpha$, which is also known as the likelihood. Most importantly, $P(\theta, \alpha)$ is 
+the prior probability, which means that we can use the estimate of the probability of $\theta, \alpha$ 
+that we obtain outside the research and use it in the current research.
+
+The following formula is the model that we are using (Model 1):
+
+$$
+\begin{aligned}
+log(\frac{p}{1-p}) = &\beta_0 + \beta_{state}x_{state} \\& + \beta_{gender}x_{gender} + \beta_{age}x_{age} + \beta_{race}x_{race} \\&+ \beta_{edu}x_{edu} + \beta_{employ}x_{employ} + \beta_{income}x_{income} \\
+\beta_{gender} &\sim N(0, 10) \\
+\beta_{age} &\sim N(0, 10) \\
+\beta_{race} &\sim N(0, 10) \\
+\beta_{edu} &\sim N(0, 10) \\
+\beta_{edu} &\sim N(0, 10) \\
+\beta_{employ} &\sim N(0, 10) \\
+\beta_{0} &\sim student-T(3, 0, 2.5)
+\end{aligned}
+$$
+
+In the equation, p is the probability of the respondents vote for the candidates. In this case, if p is 
+higher than 0.5, then the respondents vote for Joe Biden. On the other hand, if p is lower than 0.5, 
+then the respondents vote for Donald Trump. For the parameters,  $\beta_{state}$ is the parameter for 
+the state variable, $\beta_{gender}$is the parameter for respondents' gender, $\beta_{age}$ is the 
+parameter for respondents' age, $\beta_{edu}$ is the respondents education level, $\beta_{employ}$ is 
+the parameter for the respondents' employment status, and $\beta_{income}$ is the parameter for the 
+respondents' income level. For the priors, we pick weakly informed priors for the parameters that we 
+just mentioned. As the coefficients in logistic regression could be in a broad range, we make the priors
+for the coefficients distributed with the variance of 10 and 0 mean. By picking weakly informed priors, 
+we can prevent our data from being too sensitive to our prior. For the intercept $\beta_0$, we use the 
+default prior, which is student t-distribution with degrees of freedom =  3, mean = 0, and standard 
+deviation of 2.5. After deciding the model, we will run and interpret this model in R Programming 
+Language with library Bayesian Regression Models using 'Stan' (brms).
+
+However, before we jump into interpreting the data, we have to check for the model convergence. Model 
+convergence is an essential factor to consider since the parameters would not be trustworthy and should 
+not be interpreted. The assessing method that we are going to use is Posterior Predictive Checks. How 
+this checking method is going to work is that after simulated random draws from posterior predictive 
+distribution, if the model has converged, we would expect that the lines of $y_{rep}$ will be roughly 
+similar to the observed y data. From the graph below (Figure 6), we can see the lines appear in a roughly similar 
+pattern. Thus we can say that this model converges, and we can move on to interpret the parameters. For 
+Generalized Linear Model, there is an assumption on constant error variance. However, since the model we
+are using here is logistic regression and the error variance is not a parameter in the Bernoulli 
+Distribution, we will not consider this assumption.
+
+```{r, fig.cap="Posterior Predictive Checks for convergence", message=FALSE, echo=FALSE, fig.width = 4, fig.height = 2}
+pp_check(voting_fit) +
+  ggtitle("Posterior Predictive Checks") +
+  xlab("Probability") +
+  ylab("Levels")
+```
+
+Originally,  we were going to use regularization/partial pooling regression model. In brief, this regression model allows us to assess the underlying effects contributed by the variables that we are interested in. The model is regarded as follows (Model 2):
+
+$$
+\begin{aligned}
+log(\frac{p}{1-p}) = & \alpha_{state[i]} +\beta_0 \\& + \beta_{gender}x_{gender} + \beta_{age}x_{age} + \beta_{race}x_{race} \\&+ \beta_{edu}x_{edu} + \beta_{employ}x_{employ} + \beta_{income}x_{income} \\
+\beta_{gender} &\sim N(0, 10) \\
+\beta_{age} &\sim N(0, 10) \\
+\beta_{race} &\sim N(0, 10) \\
+\beta_{edu} &\sim N(0, 10) \\
+\beta_{edu} &\sim N(0, 10) \\
+\beta_{employ} &\sim N(0, 10) \\
+\beta_{0} &\sim student-T(3, 0, 2.5) \\
+\alpha_{state[i]} &\sim student-T(3, 0, 2.5) 
+\end{aligned}
+$$
+
+Other than the $\alpha_{state[i]}$is different from Model 1, the rest is the same. Here the use $\alpha_{state[i]}$ means that there might be underlying state effects in the dataset and i indicates the order of different states.
+
+However, during the model diagnostic stage, it has a lower correctly-predicted rate (Model 1: **64.7%** vs 
+Model 2: **63.1%**). The method for doing this is to predict the original data that we fit the model in and 
+see the right classificationrate (True Positive Rate). Because of the lower classification rate, we 
+discard Model 2. Also, we can reasonably conclude that States Factor is more than an underlying 
+effect. Being in different states would have effects on whom the respondents pick to vote.
+
+Other than the classification rate, we also assess the Area Under the Curve. It is a measure of the 
+ability of a classifier to distinguish between classes. The way to interpret the result is when the AUC 
+value is between 0.5 and 1, there is a high chance that the classification will predict the value 
+correctly. In our model, the AUC is **0.7078**, whish is in the range of 0.5 and 1. Thus we can continue and
+use this model.
+
+## Post-Stratification
+
+After fitting the data to the Multi-Level Logistic Regression, we can start applying the
+post-stratification ACS data into this model. The coefficients for the model represents the same
+parameters as the logistic regression model mentioned above. However, they would be the estimated
+parameters since we create the model based on the observed data. Different from the Nationscape Data, 
+$X = (x_{state},...x_{income})$ are the observations from the ACS data.
+
+$$
+\begin{aligned}
+log(\frac{\hat{p}}{1-\hat{p}}) = & \hat{\beta_0} + \hat{\beta}_{state}x_{state} \\ &+ \hat{\beta}_{gender}x_{gender} + \hat{\beta}_{age}x_{age} + \hat{\beta}_{race}x_{race} \\ &+ \hat{\beta}_{edu}x_{edu} + \hat{\beta}_{employ}x_{employ} + \hat{\beta}_{income}x_{income}
+\end{aligned}
+$$
+
+After fitting the model, we will have the probability ($\hat{p}$) of the willingness to vote for either 
+candidate.
+
+# Results
+## Model Results
+
+In this section, we will present the results of the model. The parameters has a hat on them because 
+they are the estimated parameters from our logistic regression.
+
+$$
+\begin{aligned}
+log(\frac{\hat{p}}{1-\hat{p}}) & = \hat{\beta_0} + \hat{\beta}_{state}x_{state} \\& + \hat{\beta}_{gender}x_{gender} + \hat{\beta}_{age}x_{age} + \hat{\beta}_{race}x_{race} \\& + \hat{\beta}_{edu}x_{edu} + \hat{\beta}_{employ}x_{employ} + \hat{\beta}_{income}x_{income}
+\end{aligned}
+$$
+
+```{r, echo=FALSE}
+fixed_effects <- as.data.frame(fixef(voting_fit))
+kable(rbind(tail(fixed_effects), head(fixed_effects)), caption = "Head and Tails of the coefficients of the estimates")
+```
+
+However, due to the reason that there are 99 coefficients in total (Intercept + Gender + Age + Race + 
+Household Income + Education + State = 99), we will have a quick glance of the coefficients here in Table 3 and the
+full version would be in the Appendix Table 6.  To understand the coefficients, we will have to
+understand the concept of log odds. The log odds here is defined as $log(\frac{P_{Biden}}{P_{Trump}})$,
+which is the log of probability of the respondents of the Nationscape data that would vote for Joe Biden
+over the probability of the respondents of the Nationscape data that would vote for Donald Trump. As we 
+take the exponential of the coefficients, it will become $\frac{P_{Biden}}{P_{Trump}}$. If the 
+exponentiated coefficients are smaller than one, that means denominator would have higher probability. 
+On the other hand, if the exponentiated coefficients are bigger than one, it means that the numerator 
+probability would be higher.
+
+As we mentioned in the Model Section, we also tested on the accuracy of the model. The confusion matrix 
+(Table 4) below represents the accuracy and wrongly categorized predictions.
+
+```{r, echo=FALSE}
+kable(ConfusionMatrix, caption = "Confusion Matrix for the model")
+```
+
+
+## Post-Stratification Results
+
+After fitting the ACS data with the model, we will use the probability of voting for either Donald Trump or 
+Joe Biden to decide whom the respondent would have voted. If the probability of the result is larger than 0.5, then we will categorize that the 
+respondent would vote for Joe Biden and if it is less than 0.5, we will categorize that the respondent 
+would vote for Donal Trump. After categorizing them, we can see the total voting counts for Donald Trump
+and Joe Biden (Table 5). 
+
+```{r Popular vote counts, echo=FALSE}
+votes <- as.data.frame(count(post_predict_level, vote))
+colnames(votes) <- c("Candidates", "Vote Counts")
+kable(votes, caption = "Vote Counts")
+```
+
+In addition, we also plot out the voting counts in each states (Figure 7) and the heat map (Figure 8) for each state to have a
+general and quick glance of the competitiveness in each state. 
+
+```{r, fig.cap="Vote counts in each state", echo=FALSE, message=FALSE , fig.width = 7, fig.height = 3}
+ggplot(post_state_predict, aes(state, n, fill = vote)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("blue", "red")) + 
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  ylim(0, 150000) +
+  labs(title = "Vote counts in each state") +
+  ylab("Vote Counts")
+```
+
+```{r heat map, fig.cap="Head Map for different states", fig.width = 5, fig.height = 3, echo=FALSE}
+plot_usmap(data = biden, values = "prop", color = "blue") +
+  scale_fill_continuous(
+    low = "red", high = "blue1", name = "Trump (Red) or Biden (Blue)", label = scales::comma
+  ) + theme(legend.position = "right") + labs(title = "Head Map For States")
+```
+
+
+## Model vs. Post-Stratification
+
+Since we are using Nationscape data to create the model and apply the model on ACS data as 
+post-stratification for our prediction. We would want to take a look of the difference between the two 
+datasets in the states (Figure 9) and the race level (Figure 10). 
+
+```{r state and race level, fig.cap="Distribution of votes in different states for two datasets", echo = FALSE, , fig.width = 7, fig.height = 4}
+grid.arrange(post_state_vote, ind_state_vote, ncol = 1)
+```
+
+```{r, fig.cap="Distribution of votes in races for two datasets", echo = FALSE,, fig.width = 6, fig.height = 4}
+grid.arrange(post_race_vote, ind_race_vote, nrow = 1)
+```
+
+
+All the details of each results will be discussed later on in the Discussion Section.
+
+# Discussion
+
+First of all, we want to assess the precision of our model from the confusion matrix (Table 4). The accuracy of 
+the data is around 64.7%. Even though we cannot say that this is an excellent performance model, the 
+accuracy rate is higher than chance (50%). Along with the accuracy rate and the model convergence test, 
+we can say that this model is adequate but not optimal.
+
+Second of all, from the table of exponentiated coefficients (Appendix Table 5), we will discuss the variables separately to
+have some perspectives on people's opinions in each group. If we solely look at the age groups, people
+from the ACS survey data, regardless of the age group, would more likely to support Donald Trump than 
+Joe Biden. However, as we add in the factors of race and ethnicity, most races would lean towards Joe 
+Biden other than White Americans. Expressly, if we take a look at the coefficients of African Americans,
+people turn towards Joe Biden more intensively. This result corresponds to some racial sensitive 
+comments Donald Trump makes publicly. In the income section, while most of the income levels would 
+support Joe Biden, the relatively high-income level respondents such as people who have income level 
+"175000USD to 199999USD" and "250000USD and above" would lean towards Donald Trump. In the education 
+section, regardless of the education degrees, people in each education degree would support Joe Biden. 
+Most of the states lean toward supporting Joe Biden other than Arizona, Idaho, Kansas, Mississippi, 
+North Dakota, and South Carolina. Interestingly, for Vermont (VT), it has the highest effects (more 
+weight) with 12.24 to the probability of voting for Joe Biden. This has corresponded to the fact that 
+Vermont has been Democratic Party's most loyal state.
+
+After predicting the votes by running the model on the ACS data, we can get the total popular vote of 
+the election (Table 5). In terms of population vote, Joe Biden wins the election by more than 
+100000 votes. However, after we take the average of the probability of voting for each candidate, the 
+average is 0.53, with a 95% confidence interval (0.247, 0.906). It means that we are not confident that 
+Biden will win the popular vote since the probability include 0.5 (if the probability is lower than 0.5,
+it means that Trump wins the popular vote). It is well known that each state has its stance on the 
+election parties. Thus, Figure 7 talks about the distribution based on states. We can see that Biden 
+wins most of the votes in California, and Trump wins a lot more votes than Biden in Texas. The heat maps (Figure 8)shows the political positions in each state. Other than some dark red states 
+(Republican)and dark blue states (Democratic), which means that we are confident that each candidate 
+will get the electoral votes corresponding to their parties, some ambiguous states/swing states.
+
+Given that in the 2016 election, Hilary Clinton won the popular vote but lost the election because of
+the Electoral College system in the United States. Each state has its electoral votes according to their
+population obtained from the 2010 census. Here, we assume that Maine and Nebraska do not split their
+electoral votes. Biden wins the election by getting 280 electoral votes, while Trump gets 258 electoral
+votes.
+
+## Nationscape Voting vs. ACS Voting Prediction
+
+Firstly we will take a look at the proportion of votes from different states for each candidate (Figure 10). We can 
+see that in the Nationscape Data, the distribution of proportion is almost identical for Donald Trump 
+and Joe Biden. When we look at ACS data's predict on the voting situation, few states have some 
+discrepancy, where California takes up a considerable proportion of the votes that Biden gets. This 
+means that our post-stratification successfully adjusts the imbalanced in the data. However, this also 
+means that the Nationscape data probability did not capture the proportion correctly that each candidate
+will get in each state. Or in McElreath's word, the information that our Bayesian model learned is not 
+doing an excellent job of approximating the large world.
+
+For the distribution of votes in different race in Figure 10, both types of data get similar
+proportion of votes in different race and ethnicities. 
+
+## Weakness and Future Works
+
+Several weaknesses and future works can be done in this analysis, which revolves around the insufficient amount of data in this analysis.
+
+First of all, the size of the Post-Stratification Data is significantly decreased, and the potential information is lost. Due to the hardware constraint, we have to lower the observation size before actually working on the prediction. The 8GB RAM will get overload while conducting the prediction. The final observation number for our prediction is 1550789, which is obtained from random subsets of 3 million observations.
+
+Second of all, we introduced the modifications made in the dataset because we are using multi-level modeling with post-stratification. For both datasets, most of the modifications are done by generalizing the categories. This generalization process could cause some precious information to be lost in the process. For example, in the Nationscape Data, there are different categories of races, especially for the Asian and Pacific Islands. Different races could pose different elections in the election. However, due to the survey's different purposes and nature, those elements need to be taken out.
+
+For the survey, even though both organizations have done a tremendous job, there are still some improvements to be made if the budget is not concerning. Be as detail as possible for each question being asked. For example, just like the Race problem we just mentioned, when the data is more detailed, analysis of any fields would be more accurate and efficient.
+
+As the data section stated, there are weekly surveys for the Nationscape Data. In this analysis, we only utilize one week of the numerous survey. For future work, we could combine a certain number of surveys to get a more accurate classification from the model and the full ACS datasets. Regarding the model, since the weakly and the default is being used and could be not informative to some extend, some future work can be done on researching the useful priors in our models.
+
+# References
+
+## Survey/Data Source 
+
+- Tausanovitch, Chris and Lynn Vavreck . 2020 . Democracy Fund + UCLA Nationscape, October 10-17,
+  2019 (version 20200814) . Retrieved from [URL] .
+
+- U.S. Census Bureau. (2012). 2009-2011 American Community Survey 3-year Public Use Microdata
+  Samples [STATA Data file].  Retrieved from https://usa.ipums.org/usa/index.shtml
+
+- Steven Ruggles, Sarah Flood, Ronald Goeken, Josiah Grover, Erin Meyer, Jose Pacas and Matthew
+  Sobek. IPUMS USA: Version 10.0 [dataset]. Minneapolis, MN: IPUMS, 2020.
+  https://doi.org/10.18128/D010.V10.0
+
+
+## Library References
+
+- Baptiste Auguie (2017). gridExtra: Miscellaneous Functions for "Grid" Graphics. R package
+  version 2.3. https://CRAN.R-project.org/package=gridExtra
+
+- Gabry J, Simpson D, Vehtari A, Betancourt M, Gelman A (2019). “Visualization in Bayesian
+  workflow.” _J. R. Stat. Soc. A_, *182*, 389-402. doi: 10.1111/rssa.12378 (URL:
+  https://doi.org/10.1111/rssa.12378).
+
+- Hadley Wickham, Jim Hester and Romain Francois (2018). readr: Read Rectangular Text Data. R
+  package version 1.3.1. https://CRAN.R-project.org/package=readr
+
+- Hadley Wickham (2007). Reshaping Data with the reshape Package. Journal of Statistical
+  Software, 21(12), 1-20. URL http://www.jstatsoft.org/v21/i12/.
+
+- Hadley Wickham (2016). ggplot2: Elegant Graphics for Data Analysi. Springer-Verlag New York
+
+- JJ Allaire and Yihui Xie and Jonathan McPherson and Javier Luraschi and Kevin Ushey and Aron
+  Atkins and Hadley Wickham and Joe Cheng and Winston Chang and Richard Iannone (2020).
+  rmarkdown: Dynamic Documents for R. R package version 2.3. URL
+  https://rmarkdown.rstudio.com.
+
+- Kay M (2020). _tidybayes: Tidy Data and Geoms for Bayesian Models_. doi:
+  10.5281/zenodo.1308151 (URL: https://doi.org/10.5281/zenodo.1308151), R package version 2.1.1,
+  <URL: http://mjskay.github.io/tidybayes/>.
+
+- Paul-Christian Bürkner (2017). brms: An R Package for Bayesian Multilevel Models Using Stan.
+  Journal of Statistical Software, 80(1), 1-28. doi:10.18637/jss.v080.i01
+
+- Paul-Christian Bürkner (2018). Advanced Bayesian Multilevel Modeling with the R Package
+  brms. The R Journal, 10(1), 395-411. doi:10.32614/RJ-2018-017
+
+- Paolo Di Lorenzo (2020). usmap: US Maps Including Alaska and Hawaii. R package version
+  0.5.1. https://CRAN.R-project.org/package=usmap
+
+- R Core Team (2020). R: A language and environment for statistical computing. R Foundation
+  for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+
+- Sing T, Sander O, Beerenwinkel N, Lengauer T (2005). “ROCR: visualizing classifier performance
+  in R.” _Bioinformatics_, *21*(20), 7881. <URL: http://rocr.bioinf.mpi-sb.mpg.de>.
+
+- Wickham et al., (2019). Welcome to the tidyverse. Journal of Open Source Software, 4(43),
+  1686, https://doi.org/10.21105/joss.01686
+  
+- Yihui Xie (2020). knitr: A General-Purpose Package for Dynamic Report Generation in R. R
+  package version 1.29.
+  
+
+# Appendix
+```{r, echo = FALSE}
+kable(exp(fixef(voting_fit)), caption = "Parameter Estimate for our model")
+```
+
+
