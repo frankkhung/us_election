@@ -1,5 +1,5 @@
 ---
-title: "US election"
+title: "Prediction: Joe Biden Wins the 2020 Election with Popular Vote and Minor Lead in Electoral College Votes"
 author: "Chien-Che Hung"
 date: "11/2/2020"
 abstract: |
@@ -429,7 +429,7 @@ estimates, which can be understood as a weighted average from all possible combi
 attributes as we will talk about the variables being used in the following sub-sections. Our total
 combinations (cells) of $51*2*9*7*10*3*24 = 4626720$; these cells will be predicted after the model for
 Nationscape Data is built. After introducing the brief idea for MRP, the following are the steps to
-construct the MRP model:
+construct the MRP model (Lauren Kennedya and Andrew Gelman (2020)):
 
 1. Collect demographic features during the survey collection stage and identify the post-stratification data.
 2. Pick out the shared variables and the variable that we are going to train on.
@@ -678,7 +678,7 @@ for the coefficients distributed with the variance of 10 and 0 mean. By picking 
 we can prevent our data from being too sensitive to our prior. For the intercept $\beta_0$, we use the 
 default prior, which is student t-distribution with degrees of freedom =  3, mean = 0, and standard 
 deviation of 2.5. After deciding the model, we will run and interpret this model in R Programming 
-Language with library Bayesian Regression Models using 'Stan' (brms).
+Language (R Core Team (2020)) with library Bayesian Regression Models using 'Stan' (brms) (Paul-Christian Bürkner (2017)).
 
 However, before we jump into interpreting the data, we have to check for the model convergence. Model 
 convergence is an essential factor to consider since the parameters would not be trustworthy and should 
@@ -870,8 +870,7 @@ will get the electoral votes corresponding to their parties, some ambiguous stat
 Given that in the 2016 election, Hilary Clinton won the popular vote but lost the election because of
 the Electoral College system in the United States. Each state has its electoral votes according to their
 population obtained from the 2010 census. Here, we assume that Maine and Nebraska do not split their
-electoral votes. Biden wins the election by getting 280 electoral votes, while Trump gets 258 electoral
-votes.
+electoral votes. **Biden wins the election by getting 280 electoral votes, while Trump gets 258 electoral votes.**
 
 ## Nationscape Voting vs. ACS Voting Prediction
 
@@ -882,7 +881,7 @@ discrepancy, where California takes up a considerable proportion of the votes th
 means that our post-stratification successfully adjusts the imbalanced in the data. However, this also 
 means that the Nationscape data probability did not capture the proportion correctly that each candidate
 will get in each state. Or in McElreath's word, the information that our Bayesian model learned is not 
-doing an excellent job of approximating the large world.
+doing an excellent job of approximating the large world ((Mathias Harrer, Doing Meta-Analysis in R)).
 
 For the distribution of votes in different race in Figure 10, both types of data get similar
 proportion of votes in different race and ethnicities. 
@@ -940,6 +939,16 @@ As the data section stated, there are weekly surveys for the Nationscape Data. I
   10.5281/zenodo.1308151 (URL: https://doi.org/10.5281/zenodo.1308151), R package version 2.1.1,
   <URL: http://mjskay.github.io/tidybayes/>.
 
+- Lauren Kennedya and Andrew Gelman (2020). Know your 
+  population and know your model: Using model-based 
+  regression and post-stratification to generalize findings 
+  beyond the observed sample. arXiv: https://arxiv.org/pdf/1906.11323.pdf
+
+- Mathias Harrer, M., Cuijpers, P., Furukawa, P.,
+&amp; Ebert, A. (n.d.). Doing Meta-Analysis in R.
+Retrieved November 02, 2020, from
+https://bookdown.org/MathiasHarrer/Doing_Meta_Analysisin_R/bayesian-meta-analysis-in-r-using-the-brms-packag.html
+
 - Paul-Christian Bürkner (2017). brms: An R Package for Bayesian Multilevel Models Using Stan.
   Journal of Statistical Software, 80(1), 1-28. doi:10.18637/jss.v080.i01
 
@@ -967,4 +976,7 @@ As the data section stated, there are weekly surveys for the Nationscape Data. I
 kable(exp(fixef(voting_fit)), caption = "Parameter Estimate for our model")
 ```
 
+## Git Repository
+
+The files to the R scripts are in this GitHub Repository: https://github.com/frankkhung/us_election
 
