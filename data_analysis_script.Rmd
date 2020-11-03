@@ -127,7 +127,7 @@ race <- ggplot(data = total_race, aes(x = as.factor(CAT), y = PROB, group = as.f
   geom_line() +
   theme_classic() +
   labs(title = "Race Distributions", x = "Race", y = "Proportion") +
-  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Nationscape Data", "ACS Data")) + 
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
@@ -156,7 +156,7 @@ gender <- ggplot(data = total_gender,
   geom_point(stat = "identity", colour = "black") + 
   geom_line() +
   theme_classic() +
-  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Nationscape Data", "ACS Data")) + 
   labs(title = "Gender Distributions", x = "Gender", y = "Proportion") +
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
@@ -183,7 +183,7 @@ age <- ggplot(data = total_age, aes(x = as.factor(CAT), y = PROB, group = as.fac
   geom_line() +
   theme_classic() +
   labs(title = "Age Distributions", x = "Age", y = "Proportion") +
-  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Nationscape Data", "ACS Data")) + 
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 # Plot the employment comparison between post-stratification data and individual level data 
@@ -209,7 +209,7 @@ employment <- ggplot(data = total_employment, aes(x = as.factor(CAT), y = PROB, 
   geom_line() +
   theme_classic() +
   labs(title = "Employment Distribution", x = "Employment", y = "Proportion") +
-  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Nationscape Data", "ACS Data")) + 
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 # Plot the education comparison between post-stratification data and individual level data 
@@ -236,7 +236,7 @@ education <- ggplot(data = total_education,
   geom_line() +
   theme_classic() +
   labs(title = "Education Distribution", x = "Education Types", y = "Proportion") +
-  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels =c("Nationscape Data", "ACS Data")) + 
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 # Plot the state comparison between post-stratification data and individual level data 
@@ -262,7 +262,7 @@ state <- ggplot(data = total_state, aes(x = as.factor(CAT), y = PROB, group = as
   geom_line() +
   theme_classic() +
   labs(title = "State Distributions", x = "State", y = "Proportion") +
-  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Nationscape Data", "ACS Data")) + 
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 # Plot the income comparison between post-stratification data and individual level data 
@@ -288,7 +288,7 @@ income <- ggplot(data = total_household_income, aes(x = as.factor(CAT), y = PROB
   geom_line() +
   theme_classic() +
   labs(title = "Income Distribution", x = "Income Categories", y = "Proportion") +
-  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Individual Level Data", "Post Stratification Data")) + 
+  scale_linetype_manual(name = "Data Types", values = c("longdash", "solid"), labels = c("Nationscape Data", "ACS Data")) + 
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 ```
 
@@ -454,12 +454,11 @@ variables on probability for a person to vote. For example, do races contribute 
 to the probability of voting for Joe Biden? After obtaining the prediction based on the Nationscape
 data, we will determine the popular vote for this election. Secondly, as the race factor predominantly
 affects the election, it could suggest the candidates' policy direction. For instance, construct
-policies towards certain income levels of people. Given that in 2016, Hillary Clinton won the popular
-vote and lost the electoral college vote. We will also consider which candidate wins in the Electoral
+policies towards certain income levels of people. We will also consider which candidate wins in the Electoral
 College.
 
-In this report, we will talk about the data where we thoroughly talk about how the data was obtained,
-the surveys were asked, and the reasoning behind the variables that we chose. After the Data section, we
+In the Data section of the report, we will talk about the data thoroughly on  how the data was obtained,
+the surveys were asked, and the reasoning behind the variables that we choose. After the Data section, we
 will discuss the modeling method that we use and why we choose this specific model. The Result section
 and the Discussion section come after. We talk about the results of our statistical analysis and what
 conclusions can be made through the results.
@@ -483,6 +482,8 @@ construct the MRP model (Lauren Kennedya and Andrew Gelman (2020)):
 3. Estimate the parameters in the model.
 4. Estimate the post-stratification values from the estimated model.
 
+Despite the convenience of the MRP model, there are still some weaknesses. Some of the weaknessess and limitations also occur in our analysis. Firstly, our model would fail to have good prediction due to insufficient amount of data, or the individual level data (sample data) creates a certain bias towards the population. Secondly, since individual level data and post-stratification level data need to have identitical variables and responses categories, the generalization of data from one to another often loses some detailed information during the process. 
+
 This report uses the datasets from Democracy Fund + UCLA Nationscape as our sampled dataset to reconstruct the American Community Survey Datasets. In this section, we will thoroughly discuss the purpose of each data and details about the data.
 
 ## Democracy + UCLA Nationscape Data 
@@ -491,7 +492,7 @@ The first data that we are going to use is from Democracy Fund + UCLA Nationscap
 between the Democracy Fund Voter Study Group and the University of California Los Angeles Political
 Scientist. Lucid provides the samples. Lucid is a market research platform that runs an online exchange
 for survey respondents. The population from the data covers from every county, congressional district to
-mid-sized U.S. cities. It aims to understand people's opinions on the 2020 election. Nationscape
+mid-sized U.S. cities. Nationscape aims to understand people's opinions on the 2020 election. It
 conducts weekly surveys and an estimated 500,000 interviews of Americans from July 2019 through December
 2020. While the population for this survey is every American eligible to vote, the sampling frame would
 be the "suppliers" on the Lucid Marketplace Platform. Normally, if the interviews of this sruvey
@@ -501,10 +502,10 @@ low.
 
 In the study, the sample would be those who have access to the Lucid Marketplace Platform on a networked
 computer or mobile device as the mode of the interview is the online survey. The sampling method on this
-platform is called Programmatic Sampling, which automates buying and selling the sample [citation].
+platform is called Programmatic Sampling, which automates buying and selling the sample (Patrick Comer (2019)).
 Using this method, Nationscape could get an enormous amount of data with less cost and human resources.
-Thus, the platform samples accept the selection from the party that creates the survey and willing to
-survey the platform. There are roughly 12% of the selected people or groups declined to do the survey, 
+The platform user accept the selection from the party that creates the survey and answer the survey 
+ survey on the platform. There are roughly 12% of the selected people or groups declined to do the survey, 
 and 5% of the people stopped doing the survey half-way. These respondents are dropped and not included
 in the data. However, even though the survey asks the respondents about their household income levels,
 they have the option not to answer the question. To deal with this question's non-responses, targets for
@@ -521,17 +522,15 @@ your household get food stamps or use a food stamp benefit card at any time duri
 people speak the truth regarding these topics, the Lucid Marketplace Platform sampling method might not
 get a sample that represents the population.
 
-As we look deeper into the survey, we can see that it covers a wide range of questions, including
-questions about respondents' attitudes, behaviors, and facts about their lives. These detailed questions
-could be a strength during the step of the analysis. However, the advantages could also be weaknesses.
-For instance, "How much do you trust the people in your neighborhood?" The answer to this question could
-depend on how the respondent defines their neighborhoods. Alternatively, some questions might make the
-respondents unwilling to tell the truth about unwillingness or embarrassment, such as "Did anyone in
-your household get food stamps or use a food stamp benefit card at any time during 2018?". Even if
-people speak the truth regarding these topics, the Lucid Marketplace Platform sampling method might not
-get a sample that represents the population.
+As mentioned above, the sets of data are collected weekly. Here, we are going to pick the results gathered during the week of 
+June 25th, 2020. As mentioned in the Introduction section, this research aims to predict the winner of the upcoming 2020 United
+States Election. There are several fundamental elements from the respondents that would affect the election outcome, for 
+example, the necessary information such as gender, age, race, and individual information such as education level and income 
+level. There are two reasons why we decide to use these variables. Firstly, it is general enough to cover the respondents' 
+situations, yet not too detail to make the analysis too complicated. Secondly, since we perform multilevel modeling with 
+post-stratification, the variables from two datasets have to match.
 
-The following table (Table 1) is how the data looks like. It contains the variables that we are using and the variables that are mentioned in the report. 
+he following table (Table 1) is how the data looks like. It contains the variables that we are using and the variables that are mentioned in the report. 
 
 ```{r how data looks, echo=FALSE}
 # a quick glance of the data
@@ -671,7 +670,6 @@ state
 \newpage
 
 # Model
-## Post-Stratification
 
 From the previous sections, we mentioned that we would use multi-level modeling with post-stratification
 to predict who will win the 2020 United States Election. Before the post-stratification stage, we are
@@ -815,7 +813,7 @@ $$
 ```{r, echo=FALSE}
 # list out the shorter version of the coefficients
 fixed_effects <- as.data.frame(fixef(voting_fit))
-kable(rbind(tail(fixed_effects), head(fixed_effects)), caption = "Head and Tails of the coefficients of the estimates")
+kable(rbind(tail(fixed_effects), head(fixed_effects)), caption = "Head and Tails of the coefficients of the estimates", digits = 3)
 ```
 
 However, due to the reason that there are 99 coefficients in total (Intercept + Gender + Age + Race + 
@@ -985,7 +983,7 @@ As the data section stated, there are weekly surveys for the Nationscape Data. I
 - Baptiste Auguie (2017). gridExtra: Miscellaneous Functions for "Grid" Graphics. R package
   version 2.3. https://CRAN.R-project.org/package=gridExtra
 
-- Gabry J, Simpson D, Vehtari A, Betancourt M, Gelman A (2019). “Visualization in Bayesian
+- Jona Gabry, Daniel Simpson, Aki Vehtari, Michael Betancourt, Andrew Gelman (2019). “Visualization in Bayesian
   workflow.” _J. R. Stat. Soc. A_, *182*, 389-402. doi: 10.1111/rssa.12378 (URL:
   https://doi.org/10.1111/rssa.12378).
 
@@ -1002,7 +1000,7 @@ As the data section stated, there are weekly surveys for the Nationscape Data. I
   rmarkdown: Dynamic Documents for R. R package version 2.3. URL
   https://rmarkdown.rstudio.com.
 
-- Kay M (2020). _tidybayes: Tidy Data and Geoms for Bayesian Models_. doi:
+- Matthew Kay(2020). _tidybayes: Tidy Data and Geoms for Bayesian Models_. doi:
   10.5281/zenodo.1308151 (URL: https://doi.org/10.5281/zenodo.1308151), R package version 2.1.1,
   <URL: http://mjskay.github.io/tidybayes/>.
 
@@ -1015,6 +1013,8 @@ As the data section stated, there are weekly surveys for the Nationscape Data. I
 &amp; Ebert, A. (n.d.). Doing Meta-Analysis in R.
 Retrieved November 02, 2020, from
 https://bookdown.org/MathiasHarrer/Doing_Meta_Analysisin_R/bayesian-meta-analysis-in-r-using-the-brms-packag.html
+
+- Patrick Comer (2019). Sampling in the Digital Age. Retrieved November 03, 2020, from https://luc.id/blog/sampling-in-the-digital-age/
 
 - Paul-Christian Bürkner (2017). brms: An R Package for Bayesian Multilevel Models Using Stan.
   Journal of Statistical Software, 80(1), 1-28. doi:10.18637/jss.v080.i01
@@ -1041,7 +1041,7 @@ https://bookdown.org/MathiasHarrer/Doing_Meta_Analysisin_R/bayesian-meta-analysi
 # Appendix
 ```{r, echo = FALSE}
 # full table for the coefficients
-kable(exp(fixef(voting_fit)), caption = "Parameter Estimate for our model")
+kable(exp(fixef(voting_fit)), caption = "Parameter Estimate for our model", digits = 3)
 ```
 
 ## Git Repository
